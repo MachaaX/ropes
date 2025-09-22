@@ -196,13 +196,17 @@ def build_figure(df: pd.DataFrame, cfg: Dict[str, Any]) -> go.Figure:
     fields = cfg["fields"]
     bands = cfg["voltage_bands"]
     vcol = fields["voltage"]
-
-    all_lines: list[list[tuple[float, float]]] = []
-    traces: list[go.Scattermap] = []
-    shown_band_label: set[str] = set()
     line_width = int(cfg["map"]["line"].get("width", 2))
 
     use_cache = "geom_lines" in df.columns
+
+    # --- Bucket coordinates by band label ---
+    # label -> {"lon": [...], "lat": [...], "custom": [...]}
+    buckets: dict[str, dict[str, list]] = {}
+    # label -> {"color": "#RRGGBB"}
+    band_meta: dict[str, dict[str, Any]] = {}
+
+    all_lines: list[list[tuple[float, float]]] = []
 
     for _, row in df.iterrows():
         lines = row["geom_lines"] if use_cache else parse_multilinestring(row[fields["geometry"]])
@@ -210,43 +214,66 @@ def build_figure(df: pd.DataFrame, cfg: Dict[str, Any]) -> go.Figure:
             continue
 
         voltage = parse_voltage(row[vcol])
-        band = pick_voltage_band(bands, voltage)
-        color = (band or {}).get("color", "#888888")
-        label = (band or {}).get("label", "Unknown")
+        band = pick_voltage_band(bands, voltage) or {}
+        label = band.get("label", "Unknown")
+        color = band.get("color", "#888888")
+        band_meta.setdefault(label, {"color": color})
 
         from_name = str(row.get(fields["from"], ""))
         to_name   = str(row.get(fields["to"],   ""))
         typ       = str(row.get(fields["type"],  ""))
         status    = str(row.get(fields["status"],""))
 
-        hover = (
-            f"<b>{from_name}</b> → <b>{to_name}</b><br>"
-            f"Voltage: {voltage}<br>"
-            f"Type: {typ}<br>"
-            f"Status: {status}<br>"
-            f"Band: {label}"
-        )
+        b = buckets.setdefault(label, {"lon": [], "lat": [], "custom": []})
 
-        hover_template = hover + "<extra></extra>"
-        
-        for line in lines:
-            lon = [p[0] for p in line]
-            lat = [p[1] for p in line]
-            traces.append(
-                go.Scattermap(
-                    lon=lon, lat=lat, mode="lines",
-                    line=dict(color=color, width=line_width),
-                    hovertemplate=hover_template,
-                    name=label, legendgroup=label,
-                    showlegend=(label not in shown_band_label),
-                )
-            )
-            shown_band_label.add(label)
-            all_lines.append(line)
+        for seg in lines:
+            # append this segment's points
+            b["lon"].extend([p[0] for p in seg])
+            b["lat"].extend([p[1] for p in seg])
+            # per-point metadata for hover
+            meta = (from_name, to_name, voltage, typ, status, label)
+            b["custom"].extend([meta] * len(seg))
+            # break between segments
+            b["lon"].append(None); b["lat"].append(None); b["custom"].append((None,)*6)
 
-    if not traces:
+            all_lines.append(seg)
+
+    if not buckets:
         raise ValueError("No map traces could be built from the CSV geometry column.")
 
+    traces: list[go.Scattermap] = []
+    hovertemplate = (
+        "<b>%{customdata[0]}</b> → <b>%{customdata[1]}</b><br>"
+        "Voltage: %{customdata[2]}<br>"
+        "Type: %{customdata[3]}<br>"
+        "Status: %{customdata[4]}<br>"
+        "Band: %{customdata[5]}<extra></extra>"
+    )
+
+    # Keep legend order consistent with config bands
+    label_order: list[str] = [b.get("label") for b in bands if b.get("label") in buckets]
+    # Append any labels not in config (e.g., "Unknown")
+    for lab in buckets.keys():
+        if lab not in label_order:
+            label_order.append(lab)
+
+    for label in label_order:
+        data = buckets[label]
+        traces.append(
+            go.Scattermap(
+                lon=data["lon"],
+                lat=data["lat"],
+                mode="lines",
+                line=dict(color=band_meta[label]["color"], width=line_width),
+                name=label,
+                legendgroup=label,
+                showlegend=True,                # one legend entry per band
+                hovertemplate=hovertemplate,
+                customdata=data["custom"],
+            )
+        )
+
+    # --- Initial view ---
     iview = cfg["map"]["initial_view"]
     if iview.get("method", "auto") == "fixed":
         center = {
@@ -262,23 +289,25 @@ def build_figure(df: pd.DataFrame, cfg: Dict[str, Any]) -> go.Figure:
     style = cfg["map"].get("style", "open-street-map")
     fig = go.Figure(data=traces)
     fig.update_layout(
-        map=dict(
-            style=style,
-            center=dict(lat=center["lat"], lon=center["lon"]),
-            zoom=float(zoom)
-        ),
+        map=dict(style=style, center=dict(lat=center["lat"], lon=center["lon"]), zoom=float(zoom)),
         margin=dict(l=0, r=0, t=0, b=0),
         legend=dict(orientation="h", yanchor="bottom", y=0.01, xanchor="left", x=0.01),
     )
-    
+
+
     debug_cfg = bool(cfg.get("app", {}).get("debug", True))
     print_once = should_print_once(debug_cfg)
     if debug_cfg and print_once:
+        total_points = sum(
+            sum(1 for x in buckets[label]["lon"] if x is not None) for label in buckets
+        )
         print("\n--------------------------------------")
         print(f"[MAP VIEW] center={center}  zoom={zoom}")
+        print(f"[TRACES] bands_drawn={len(traces)}  total_points={total_points}")
         print("--------------------------------------\n")
-        
+
     return fig
+
 
 # -----------------------------
 # CLI args + main
