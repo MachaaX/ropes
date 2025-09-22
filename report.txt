@@ -1,0 +1,3 @@
+I was presented with ransmission_line_table.csv, which has the following columns:
+['OBJECTID', 'ID', 'SUB_1', 'SUB_2', 'VOLTAGE', 'TYPE','STATUS', 'SHAPE_Length', 'geometry']
+

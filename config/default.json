@@ -1,0 +1,40 @@
+{
+  "app": {
+    "title": "ROPES - Transmission Map",
+    "host": "0.0.0.0",
+    "port": 8050,
+    "debug": false
+  },
+  "data": {
+    "csv_path": "data/sample.csv"
+  },
+  "map": {
+    "style": "carto-positron",
+    "initial_view": {
+      "method": "auto",
+      "fallback_zoom": 5,
+      "bbox_padding_deg": 0.1,
+      "fixed_center": { "lat": 39.5, "lon": -98.35 },
+      "fixed_zoom": 4
+    },
+    "line": {
+      "width": 3
+    }
+  },
+  "fields": {
+    "id": "ID",
+    "from": "SUB_1",
+    "to": "SUB_2",
+    "voltage": "VOLTAGE",
+    "type": "TYPE",
+    "status": "STATUS",
+    "geometry": "geometry"
+  },
+  "voltage_bands": [
+    { "min": 0, "max": 250, "color": "#2ecc71", "label": "0–250" },
+    { "min": 250, "max": 500, "color": "#3498db", "label": "250–500" },
+    { "min": 500, "max": 750, "color": "#f39c12", "label": "500–750" },
+    { "min": 750, "max": 1000, "color": "#e74c3c", "label": "750–1000" },
+    { "min": 1000, "max": 999999999, "color": "#8e44ad", "label": "≥1000" }
+  ]
+}

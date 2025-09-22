@@ -1,0 +1,12 @@
+/.vscode/
+
+/data/*.csv
+!/data/sample.csv
+
+/data/cache/
+/data/raw/
+/data/geo_files/
+
+.env
+__pycache__/
+*.pyc
