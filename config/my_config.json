@@ -1,8 +1,8 @@
 {
   "data": {
-    "csv_path": "data/sample_10k_rows.csv"
+    "csv_path": "data/transmission_line_table.csv"
   },
-  "map": {
-    "style": "open-street-map"
+  "app": {
+    "debug": true
   }
 }
