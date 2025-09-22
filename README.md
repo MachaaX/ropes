@@ -8,4 +8,4 @@ The data used for the project can be downloaded from the [Box Folder](https://ru
 [report.txt file](report.txt) holds all the code documentation, including the inputs and outputs of each function.
 
 # Visualizations
-All the visualziation built is hosted on Render and can be seen [here](https://render.com/).
+All the visualizations built are hosted on Render and can be seen [here](https://ropes-qi46.onrender.com/).
